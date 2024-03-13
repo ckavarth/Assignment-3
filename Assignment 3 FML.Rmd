@@ -1,0 +1,143 @@
+---
+title: "Assignment_3_FML"
+author: "Chaitanya"
+date: "2024-03-08"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# SUMMARY) Naive Bayes is based on the assumption that features (variables) are conditionally independent given the class label. This simplifying assumption allows us to compute probabilities efficiently.The file UniversalBank.csv contains data on 5000 customers of Universal Bank.we focus on two predictors: Online & CCAVg as creditcard and outcome as personalloan.By using confusion matrix examining these predictors and the outcome variable, the goal is to understand factors influencing the acceptance of personal loan offers and potentially build predictive models to identify customers likely to accept such offers in future.
+
+```{r}
+#A)# Create a pivot table for the training data with Online as a column variable, CC as a row variable, and Loan as a secondary row variable.Creating a pivot table 
+# By Using melt() and cast() functions.
+library(dplyr)
+library(caret)
+library(ISLR)
+library(reshape2)
+library(e1071)
+library(naivebayes)
+
+# Import the UniversalBank.csv file from the pc location
+df <- read.csv("C:\\Users\\Chaitu\\Documents\\UniversalBank.csv")
+
+# Partitioning the data into training (60%) and validation (40%) sets
+set.seed(123)  # For reproducibility
+train_indices <- sample(1:nrow(df), 0.6 * nrow(df))
+train_data <- df[train_indices, ]
+validation_data <- df[-train_indices, ]
+nb_model <- naiveBayes(Personal.Loan ~ CCAvg + Online, data = train_data)
+# Melting the data function is used to reshape data from wide format to long format
+melt_df <- melt(df, id.vars = c("Online", "CCAvg", "Personal.Loan"), measure.vars = "Personal.Loan")
+
+#The dcast() function in R is an part of the data.table package. It will allows you to reshape a data frame from a long format to a wide format.
+pivot_table <- dcast(melt_df, Online + CCAvg ~ Personal.Loan, value.var = "value", fun.aggregate = length)
+print(pivot_table)
+```
+#B)classifying a customer who owns a bank credit card and is actively using online banking services.probability of loan acceptance (Loan = 1) conditional on having a bank credit card (CC = 1) and  (Online= 1)].
+
+```{r}
+# Subsetting the data for customers with CCAvg = 1 and Online = 1
+subset_data <- df[df$CCAvg == 1 & df$Online == 1, ]
+
+# Calculate the probability of loan acceptors
+loan_acceptance_prob <- sum(subset_data$Personal.Loan == 1) / nrow(subset_data)
+print(loan_acceptance_prob)
+```
+
+#c)Two separate pivot tables
+# One will have Personal.Loan (rows) as a function of Online (columns) and the other will have Personal.Loan (rows) as a function of CCAvg
+
+```{r}
+#Create pivot table for Personal.Loan as a function of Online
+pivot_table_online <- dcast(melt_df, Personal.Loan ~ Online, value.var = "value", fun.aggregate = length)
+
+# Create pivot table for Loan as a function of CCAvg
+pivot_table_ccavg <- dcast(melt_df, Personal.Loan ~ CCAvg, value.var = "value", fun.aggregate = length)
+
+# Display the pivot tables
+
+print("Personal.Loan (rows) as a function of Online (columns):")
+print(pivot_table_online)
+
+print("\nLoan (rows) as a function of CCAvg:")
+print(pivot_table_ccavg)
+```
+#D. Computing the following quantities [P(A | B) means “the probability of A given B”]: 
+```{r}
+# i. P(CCAvg = 1 | Personal.Loan = 1)
+prob_ccavg_given_loan <- sum(subset_data$CCAvg == 1 & subset_data$Personal.Loan == 1) / sum(subset_data$Personal.Loan == 1)
+
+# ii. P(Online = 1 | Personal.Loan = 1)
+prob_online_given_loan <- sum(subset_data$Online == 1 & subset_data$Personal.Loan == 1) / sum(subset_data$Personal.Loan == 1)
+
+# iii. P(Personal.Loan = 1)
+prob_loan_acceptance <- sum(df$Personal.Loan == 1) / nrow(df)
+
+# iv. P(CCAvg = 1 | Personal.Loan = 0)
+prob_ccavg_given_no_loan <- sum(subset_data$CCAvg == 1 & subset_data$Personal.Loan == 0) / sum(subset_data$Personal.Loan == 0)
+
+# v. P(Online = 1 | Personal.Loan = 0)
+prob_online_given_no_loan <- sum(subset_data$Online == 1 & subset_data$Personal.Loan == 0) / sum(subset_data$Personal.Loan == 0)
+
+# vi. P(Personal.Loan = 0)
+prob_no_loan_acceptance <- 1 - prob_loan_acceptance
+
+#printing the following quantities for each of one
+cat(prob_ccavg_given_loan)
+cat(prob_online_given_loan)
+cat(prob_loan_acceptance)
+cat(prob_ccavg_given_no_loan)
+cat(prob_online_given_no_loan)
+
+```
+# E)quantities above to compute the naive Bayes probability P(Loan = 1 | CC= 1, Online =1).
+```{r}
+prob_ccavg_given_loan <- 1  # P(CCAvg = 1 | Loan = 1)
+prob_online_given_loan <- 1  # P(Online = 1 | Loan = 1)
+prob_loan_acceptance <- 0.096
+# numerator for the quantities
+numerator <- prob_ccavg_given_loan * prob_online_given_loan * prob_loan_acceptance
+
+# denominator for the quantities
+prob_cc <- sum(df$CCAvg == 1) / nrow(df)  # P(CCAvg = 1)
+prob_online <- sum(df$Online == 1) / nrow(df)  # P(Online = 1)
+denominator <- prob_cc * prob_online
+
+# probability for prob_loan_given_cc_online
+prob_loan_given_cc_online <- numerator / denominator
+
+# Printing the result:
+cat("Naive Bayes probability P(Loan = 1 | CCAvg = 1, Online = 1):", prob_loan_given_cc_online, "\n")
+```
+#F)Compare this value with the one obtained from the pivot table in (B). Which is a more accurate estimate? which is higher 
+```{r}
+prob_loan_given_cc_online <- 3.481773   # Naive Bayes probability calculated value
+loan_acceptance_prob <- 0.01388889  # pivot table value
+
+# Compare the two values
+if (prob_loan_given_cc_online > loan_acceptance_prob) {
+  cat("Naive Bayes calculated probability is higher than the pivot table value.\n")
+} else if (prob_loan_given_cc_online < loan_acceptance_prob) {
+  cat("The pivot table value is higher than the Naive Bayes calculated probability.\n")
+} else {
+  cat("The two values are equal.\n")
+}
+
+```
+#G)Computing P(Loan = 1 | CC = 1, Online = 1) Run naive Bayes on the data.
+```{r}
+# # Get the probabilities for Loan = 1 given CC = 1 and Online = 1
+validation_data$Personal.Loan <- as.factor(validation_data$Personal.Loan)
+predicted_probs <- predict(nb_model, newdata = validation_data)
+cm <- confusionMatrix(predicted_probs, validation_data$Personal.Loan)
+print(cm)
+
+prob_loan_given_CC_Online <- predict(nb_model, newdata = data.frame(CCAvg = 1, Online = 1), type = "raw")
+prob_loan_given_CC_Online[,"1"]  # Probability of Loan = 1
+
+```
